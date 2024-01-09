@@ -8,7 +8,7 @@
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Test binary, built with `go test.test -c`
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
@@ -21,3 +21,7 @@
 go.work
 
 **/.idea/*
+
+
+# I was testing
+**/node_modules/*
