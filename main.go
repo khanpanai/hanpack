@@ -3,8 +3,15 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 */
 package main
 
-import "hanpack/cmd"
+import (
+	"context"
+	"hanpack/cmd"
+	"sync"
+)
+
+var wg sync.WaitGroup
 
 func main() {
-	cmd.Execute()
+	ctx := context.Background()
+	cmd.Execute(ctx)
 }

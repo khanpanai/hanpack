@@ -1,0 +1,920 @@
+lorem   /*
+        Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+        */
+        package cmd
+
+        import (
+        	"archive/zip"
+        	"fmt"
+        	"github.com/spf13/cobra"
+        	"github.com/spf13/viper"
+        	"io"
+        	"io/fs"
+        	"log"
+        	"os"
+        	"path/filepath"
+        	"sync"
+        )
+
+        type entry struct {
+        	name string
+        	rc   io.ReadCloser
+        }
+
+        var rootCmd = &cobra.Command{
+        	Use:   "hanpack",
+        	Short: "Packing tool (initially for moodle plugins)",
+        	Long: `CLI tool for recursively packing folders skipping odd directory, such as .git, .idea, node_modules, etc.
+
+        Be aware, it can take more time if you run it in large folders`,
+        	PreRun: func(cmd *cobra.Command, args []string) {
+        		getwd, err := os.Getwd()
+        		if err != nil {
+        			panic(err)
+        		}
+
+        		name := filepath.Base(getwd)
+
+        		viper.Set("archive", fmt.Sprintf("%s.zip", name))
+        	},
+        	Run: func(cmd *cobra.Command, args []string) {
+        		f := viper.GetString("folder")
+
+        		paths := make(chan string)
+        		go processEntries(paths)
+
+        		err := filepath.Walk(f, walk(paths))
+
+        		if err != nil {
+        			return
+        		}
+
+        		go func() {
+        			close(paths)
+        		}()
+
+        	},
+        }
+
+        func processEntries(paths <-chan string) {
+
+        	f, err := os.Create(viper.GetString("archive"))
+        	defer f.Close()
+
+        	if err != nil {
+        		log.Fatal(err)
+        	}
+
+        	zw := zip.NewWriter(f)
+        	defer zw.Close()
+
+        	wg := sync.WaitGroup{}
+        	wg.Wait()
+        	//
+        	//Loop:
+        	//	for {
+        	//		select {
+        	//		case ent, ok := <-paths:
+        	//			if !ok {
+        	//				break Loop
+        	//			}
+        	//			wg.Add(1)
+        	//			go process(&wg, zw, ent)
+        	//		}
+        	//	}
+
+        	for path := range paths {
+        		wg.Add(1)
+        		go process(&wg, zw, path)
+        	}
+
+        	//
+        	//go func() {
+        	//	for path := range paths {
+        	//		wg.Add(1)
+        	//		fmt.Println(paths)
+        	//		zrd, err := zip.OpenReader(path)
+        	//		if err != nil {
+        	//			log.Fatal(err)
+        	//		}
+        	//		for _, zf := range zrd.File {
+        	//			err := zw.Copy(zf)
+        	//			if err != nil {
+        	//				log.Fatal(err)
+        	//			}
+        	//		}
+        	//		_ = zrd.Close()
+        	//		_ = os.Remove(path)
+        	//	}
+        	//	err = zw.Close()
+        	//	if err != nil {
+        	//		log.Fatal(err)
+        	//	}
+        	//	err = f.Close()
+        	//	if err != nil {
+        	//		log.Fatal(err)
+        	//	}
+        	//
+        	//}()
+        	//
+        	//wg.Wait()
+        }
+
+        func process(wg *sync.WaitGroup, zw *zip.Writer, ent string) {
+        	defer wg.Done()
+        	f, err := os.OpenFile(ent, 0655, os.ModePerm)
+        	fmt.Println(f)
+        	if err != nil {
+        		fmt.Errorf("err? %s", err)
+        		return
+        	}
+        	create, err := zw.Create(ent)
+        	if err != nil {
+        		fmt.Errorf("err? %s", err)
+        		return
+        	}
+
+        	_, err = io.Copy(create, f)
+        	if err != nil {
+        		fmt.Errorf("err? %s", err)
+        		return
+        	}
+        }
+
+        func walk(paths chan<- string) filepath.WalkFunc {
+        	return func(path string, info fs.FileInfo, err error) error {
+        		if path == "." {
+        			return nil
+        		}
+
+        		restrictedDir := []string{"node_modules", ".git", "vendor", ".idea", viper.GetString("archive")}
+
+        		for i := range restrictedDir {
+        			if restrictedDir[i] == path {
+        				return filepath.SkipDir
+        			}
+        		}
+
+        		if info.IsDir() {
+        			return nil
+        		}
+
+        		paths <- path
+        		return nil
+        	}
+        }
+
+        // Execute adds all child commands to the root command and sets flags appropriately.
+        // This is called by main.main(). It only needs to happen once to the rootCmd.
+        func Execute() {
+        	err := rootCmd.Execute()
+        	if err != nil {
+        		os.Exit(1)
+        	}
+        }
+
+        func init() {
+        	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
+
+        	err := viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
+        	if err != nil {
+        		panic(err)
+        	}
+        	viper.SetDefault("folder", ".")
+        }
+/*
+Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+*/
+package cmd
+
+import (
+	"archive/zip"
+	"fmt"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+)
+
+type entry struct {
+	name string
+	rc   io.ReadCloser
+}
+
+var rootCmd = &cobra.Command{
+	Use:   "hanpack",
+	Short: "Packing tool (initially for moodle plugins)",
+	Long: `CLI tool for recursively packing folders skipping odd directory, such as .git, .idea, node_modules, etc.
+
+Be aware, it can take more time if you run it in large folders`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		getwd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+
+		name := filepath.Base(getwd)
+
+		viper.Set("archive", fmt.Sprintf("%s.zip", name))
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		f := viper.GetString("folder")
+
+		paths := make(chan string)
+		go processEntries(paths)
+
+		err := filepath.Walk(f, walk(paths))
+
+		if err != nil {
+			return
+		}
+
+		go func() {
+			close(paths)
+		}()
+
+	},
+}
+
+func processEntries(paths <-chan string) {
+
+	f, err := os.Create(viper.GetString("archive"))
+	defer f.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	zw := zip.NewWriter(f)
+	defer zw.Close()
+
+	wg := sync.WaitGroup{}
+	wg.Wait()
+	//
+	//Loop:
+	//	for {
+	//		select {
+	//		case ent, ok := <-paths:
+	//			if !ok {
+	//				break Loop
+	//			}
+	//			wg.Add(1)
+	//			go process(&wg, zw, ent)
+	//		}
+	//	}
+
+	for path := range paths {
+		wg.Add(1)
+		go process(&wg, zw, path)
+	}
+
+	//
+	//go func() {
+	//	for path := range paths {
+	//		wg.Add(1)
+	//		fmt.Println(paths)
+	//		zrd, err := zip.OpenReader(path)
+	//		if err != nil {
+	//			log.Fatal(err)
+	//		}
+	//		for _, zf := range zrd.File {
+	//			err := zw.Copy(zf)
+	//			if err != nil {
+	//				log.Fatal(err)
+	//			}
+	//		}
+	//		_ = zrd.Close()
+	//		_ = os.Remove(path)
+	//	}
+	//	err = zw.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	err = f.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//}()
+	//
+	//wg.Wait()
+}
+
+func process(wg *sync.WaitGroup, zw *zip.Writer, ent string) {
+	defer wg.Done()
+	f, err := os.OpenFile(ent, 0655, os.ModePerm)
+	fmt.Println(f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+	create, err := zw.Create(ent)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+
+	_, err = io.Copy(create, f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+}
+
+func walk(paths chan<- string) filepath.WalkFunc {
+	return func(path string, info fs.FileInfo, err error) error {
+		if path == "." {
+			return nil
+		}
+
+		restrictedDir := []string{"node_modules", ".git", "vendor", ".idea", viper.GetString("archive")}
+
+		for i := range restrictedDir {
+			if restrictedDir[i] == path {
+				return filepath.SkipDir
+			}
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		paths <- path
+		return nil
+	}
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
+
+	err := viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
+	if err != nil {
+		panic(err)
+	}
+	viper.SetDefault("folder", ".")
+}
+/*
+Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+*/
+package cmd
+
+import (
+	"archive/zip"
+	"fmt"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+)
+
+type entry struct {
+	name string
+	rc   io.ReadCloser
+}
+
+var rootCmd = &cobra.Command{
+	Use:   "hanpack",
+	Short: "Packing tool (initially for moodle plugins)",
+	Long: `CLI tool for recursively packing folders skipping odd directory, such as .git, .idea, node_modules, etc.
+
+Be aware, it can take more time if you run it in large folders`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		getwd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+
+		name := filepath.Base(getwd)
+
+		viper.Set("archive", fmt.Sprintf("%s.zip", name))
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		f := viper.GetString("folder")
+
+		paths := make(chan string)
+		go processEntries(paths)
+
+		err := filepath.Walk(f, walk(paths))
+
+		if err != nil {
+			return
+		}
+
+		go func() {
+			close(paths)
+		}()
+
+	},
+}
+
+func processEntries(paths <-chan string) {
+
+	f, err := os.Create(viper.GetString("archive"))
+	defer f.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	zw := zip.NewWriter(f)
+	defer zw.Close()
+
+	wg := sync.WaitGroup{}
+	wg.Wait()
+	//
+	//Loop:
+	//	for {
+	//		select {
+	//		case ent, ok := <-paths:
+	//			if !ok {
+	//				break Loop
+	//			}
+	//			wg.Add(1)
+	//			go process(&wg, zw, ent)
+	//		}
+	//	}
+
+	for path := range paths {
+		wg.Add(1)
+		go process(&wg, zw, path)
+	}
+
+	//
+	//go func() {
+	//	for path := range paths {
+	//		wg.Add(1)
+	//		fmt.Println(paths)
+	//		zrd, err := zip.OpenReader(path)
+	//		if err != nil {
+	//			log.Fatal(err)
+	//		}
+	//		for _, zf := range zrd.File {
+	//			err := zw.Copy(zf)
+	//			if err != nil {
+	//				log.Fatal(err)
+	//			}
+	//		}
+	//		_ = zrd.Close()
+	//		_ = os.Remove(path)
+	//	}
+	//	err = zw.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	err = f.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//}()
+	//
+	//wg.Wait()
+}
+
+func process(wg *sync.WaitGroup, zw *zip.Writer, ent string) {
+	defer wg.Done()
+	f, err := os.OpenFile(ent, 0655, os.ModePerm)
+	fmt.Println(f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+	create, err := zw.Create(ent)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+
+	_, err = io.Copy(create, f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+}
+
+func walk(paths chan<- string) filepath.WalkFunc {
+	return func(path string, info fs.FileInfo, err error) error {
+		if path == "." {
+			return nil
+		}
+
+		restrictedDir := []string{"node_modules", ".git", "vendor", ".idea", viper.GetString("archive")}
+
+		for i := range restrictedDir {
+			if restrictedDir[i] == path {
+				return filepath.SkipDir
+			}
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		paths <- path
+		return nil
+	}
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
+
+	err := viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
+	if err != nil {
+		panic(err)
+	}
+	viper.SetDefault("folder", ".")
+}
+/*
+Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+*/
+package cmd
+
+import (
+	"archive/zip"
+	"fmt"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+)
+
+type entry struct {
+	name string
+	rc   io.ReadCloser
+}
+
+var rootCmd = &cobra.Command{
+	Use:   "hanpack",
+	Short: "Packing tool (initially for moodle plugins)",
+	Long: `CLI tool for recursively packing folders skipping odd directory, such as .git, .idea, node_modules, etc.
+
+Be aware, it can take more time if you run it in large folders`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		getwd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+
+		name := filepath.Base(getwd)
+
+		viper.Set("archive", fmt.Sprintf("%s.zip", name))
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		f := viper.GetString("folder")
+
+		paths := make(chan string)
+		go processEntries(paths)
+
+		err := filepath.Walk(f, walk(paths))
+
+		if err != nil {
+			return
+		}
+
+		go func() {
+			close(paths)
+		}()
+
+	},
+}
+
+func processEntries(paths <-chan string) {
+
+	f, err := os.Create(viper.GetString("archive"))
+	defer f.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	zw := zip.NewWriter(f)
+	defer zw.Close()
+
+	wg := sync.WaitGroup{}
+	wg.Wait()
+	//
+	//Loop:
+	//	for {
+	//		select {
+	//		case ent, ok := <-paths:
+	//			if !ok {
+	//				break Loop
+	//			}
+	//			wg.Add(1)
+	//			go process(&wg, zw, ent)
+	//		}
+	//	}
+
+	for path := range paths {
+		wg.Add(1)
+		go process(&wg, zw, path)
+	}
+
+	//
+	//go func() {
+	//	for path := range paths {
+	//		wg.Add(1)
+	//		fmt.Println(paths)
+	//		zrd, err := zip.OpenReader(path)
+	//		if err != nil {
+	//			log.Fatal(err)
+	//		}
+	//		for _, zf := range zrd.File {
+	//			err := zw.Copy(zf)
+	//			if err != nil {
+	//				log.Fatal(err)
+	//			}
+	//		}
+	//		_ = zrd.Close()
+	//		_ = os.Remove(path)
+	//	}
+	//	err = zw.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	err = f.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//}()
+	//
+	//wg.Wait()
+}
+
+func process(wg *sync.WaitGroup, zw *zip.Writer, ent string) {
+	defer wg.Done()
+	f, err := os.OpenFile(ent, 0655, os.ModePerm)
+	fmt.Println(f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+	create, err := zw.Create(ent)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+
+	_, err = io.Copy(create, f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+}
+
+func walk(paths chan<- string) filepath.WalkFunc {
+	return func(path string, info fs.FileInfo, err error) error {
+		if path == "." {
+			return nil
+		}
+
+		restrictedDir := []string{"node_modules", ".git", "vendor", ".idea", viper.GetString("archive")}
+
+		for i := range restrictedDir {
+			if restrictedDir[i] == path {
+				return filepath.SkipDir
+			}
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		paths <- path
+		return nil
+	}
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
+
+	err := viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
+	if err != nil {
+		panic(err)
+	}
+	viper.SetDefault("folder", ".")
+}
+/*
+Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+*/
+package cmd
+
+import (
+	"archive/zip"
+	"fmt"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+)
+
+type entry struct {
+	name string
+	rc   io.ReadCloser
+}
+
+var rootCmd = &cobra.Command{
+	Use:   "hanpack",
+	Short: "Packing tool (initially for moodle plugins)",
+	Long: `CLI tool for recursively packing folders skipping odd directory, such as .git, .idea, node_modules, etc.
+
+Be aware, it can take more time if you run it in large folders`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		getwd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+
+		name := filepath.Base(getwd)
+
+		viper.Set("archive", fmt.Sprintf("%s.zip", name))
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		f := viper.GetString("folder")
+
+		paths := make(chan string)
+		go processEntries(paths)
+
+		err := filepath.Walk(f, walk(paths))
+
+		if err != nil {
+			return
+		}
+
+		go func() {
+			close(paths)
+		}()
+
+	},
+}
+
+func processEntries(paths <-chan string) {
+
+	f, err := os.Create(viper.GetString("archive"))
+	defer f.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	zw := zip.NewWriter(f)
+	defer zw.Close()
+
+	wg := sync.WaitGroup{}
+	wg.Wait()
+	//
+	//Loop:
+	//	for {
+	//		select {
+	//		case ent, ok := <-paths:
+	//			if !ok {
+	//				break Loop
+	//			}
+	//			wg.Add(1)
+	//			go process(&wg, zw, ent)
+	//		}
+	//	}
+
+	for path := range paths {
+		wg.Add(1)
+		go process(&wg, zw, path)
+	}
+
+	//
+	//go func() {
+	//	for path := range paths {
+	//		wg.Add(1)
+	//		fmt.Println(paths)
+	//		zrd, err := zip.OpenReader(path)
+	//		if err != nil {
+	//			log.Fatal(err)
+	//		}
+	//		for _, zf := range zrd.File {
+	//			err := zw.Copy(zf)
+	//			if err != nil {
+	//				log.Fatal(err)
+	//			}
+	//		}
+	//		_ = zrd.Close()
+	//		_ = os.Remove(path)
+	//	}
+	//	err = zw.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	err = f.Close()
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//}()
+	//
+	//wg.Wait()
+}
+
+func process(wg *sync.WaitGroup, zw *zip.Writer, ent string) {
+	defer wg.Done()
+	f, err := os.OpenFile(ent, 0655, os.ModePerm)
+	fmt.Println(f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+	create, err := zw.Create(ent)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+
+	_, err = io.Copy(create, f)
+	if err != nil {
+		fmt.Errorf("err? %s", err)
+		return
+	}
+}
+
+func walk(paths chan<- string) filepath.WalkFunc {
+	return func(path string, info fs.FileInfo, err error) error {
+		if path == "." {
+			return nil
+		}
+
+		restrictedDir := []string{"node_modules", ".git", "vendor", ".idea", viper.GetString("archive")}
+
+		for i := range restrictedDir {
+			if restrictedDir[i] == path {
+				return filepath.SkipDir
+			}
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		paths <- path
+		return nil
+	}
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
+
+	err := viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
+	if err != nil {
+		panic(err)
+	}
+	viper.SetDefault("folder", ".")
+}

@@ -25,3 +25,5 @@ go.work
 
 # I was testing
 **/node_modules/*
+
+*.zip
