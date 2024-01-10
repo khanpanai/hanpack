@@ -5,7 +5,7 @@ package main
 
 import (
 	"context"
-	"hanpack/cmd"
+	"github.com/khanpanai/hanpack/cmd"
 	"sync"
 )
 
