@@ -26,6 +26,10 @@ var rootCmd = &cobra.Command{
 
 Be aware, it can take more time if you run it in large folders`,
 	PreRun: func(cmd *cobra.Command, args []string) {
+		err := viper.BindPFlag("folder", cmd.PersistentFlags().Lookup("folder"))
+		if err != nil {
+			panic(err)
+		}
 		folder := viper.GetString("folder")
 
 		var name string
@@ -184,10 +188,6 @@ func init() {
 	fmt.Println(fmt.Sprintf("Skipping these directories/files: %s", viper.GetStringSlice("black_list")))
 
 	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
-
-	err = viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
-	if err != nil {
-		panic(err)
-	}
 	viper.SetDefault("folder", ".")
+
 }
