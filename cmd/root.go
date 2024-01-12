@@ -26,12 +26,20 @@ var rootCmd = &cobra.Command{
 
 Be aware, it can take more time if you run it in large folders`,
 	PreRun: func(cmd *cobra.Command, args []string) {
-		getwd, err := os.Getwd()
-		if err != nil {
-			panic(err)
-		}
+		folder := viper.GetString("folder")
 
-		name := filepath.Base(getwd)
+		var name string
+
+		if folder == "." {
+			getwd, err := os.Getwd()
+			if err != nil {
+				panic(err)
+			}
+
+			name = filepath.Base(getwd)
+		} else {
+			name = filepath.Base(folder)
+		}
 
 		viper.Set("archive", fmt.Sprintf("%s.zip", name))
 	},
