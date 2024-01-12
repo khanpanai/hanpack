@@ -22,8 +22,9 @@ go.work
 
 **/.idea/*
 
-
 # I was testing
 **/node_modules/*
 
 *.zip
+
+notinclude/*

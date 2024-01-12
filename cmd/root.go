@@ -85,7 +85,6 @@ func processEntries(wg *sync.WaitGroup, paths <-chan string) {
 		file, err := os.Open(path)
 
 		if err != nil {
-			fmt.Println(path)
 			log.Fatal(err)
 		}
 
@@ -98,9 +97,8 @@ func processEntries(wg *sync.WaitGroup, paths <-chan string) {
 			log.Fatal(err)
 			return
 		}
-		if err != nil {
-			panic(err)
-		}
+
+		fmt.Println(fmt.Sprintf("Packed: %s", path))
 	}
 
 }
@@ -111,7 +109,7 @@ func walk(paths chan<- string) filepath.WalkFunc {
 			return nil
 		}
 
-		restrictedDir := append(viper.GetStringSlice("BlackList"), viper.GetString("archive"))
+		restrictedDir := append(viper.GetStringSlice("black_list"), viper.GetString("archive"))
 
 		for i := range restrictedDir {
 
@@ -175,6 +173,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Println(fmt.Sprintf("Skipping these directories/files: %s", viper.GetStringSlice("black_list")))
 
 	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
 
