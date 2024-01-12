@@ -6,7 +6,9 @@ package cmd
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
@@ -16,11 +18,6 @@ import (
 	"path/filepath"
 	"sync"
 )
-
-type entry struct {
-	name string
-	rc   io.ReadCloser
-}
 
 var rootCmd = &cobra.Command{
 	Use:   "hanpack",
@@ -114,7 +111,7 @@ func walk(paths chan<- string) filepath.WalkFunc {
 			return nil
 		}
 
-		restrictedDir := []string{"node_modules", ".git", "vendor", ".idea", viper.GetString("archive")}
+		restrictedDir := append(viper.GetStringSlice("BlackList"), viper.GetString("archive"))
 
 		for i := range restrictedDir {
 
@@ -140,9 +137,48 @@ func Execute(ctx context.Context) {
 }
 
 func init() {
+
+	homedir, err := os.UserHomeDir()
+
+	if err != nil {
+		panic(err)
+	}
+
+	homedir = filepath.Join(homedir, ".hanpack")
+	configPath := filepath.Join(homedir, "config.toml")
+	if _, err = os.Stat(homedir); errors.Is(err, os.ErrNotExist) {
+
+		err = os.Mkdir(homedir, os.ModePerm)
+
+		if err != nil {
+			panic("Can't create .hanpack folder")
+		}
+
+	}
+
+	if _, err = os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
+		file, err := os.Create(configPath)
+		if err != nil {
+			panic(errors.New("can't create cli config file to dump"))
+		}
+
+		var conf interface{}
+		_ = toml.Unmarshal([]byte(`black_list = ["node_modules", ".git", "vendor", ".idea"]`), &conf)
+		enc := toml.NewEncoder(file)
+		_ = enc.Encode(conf)
+	}
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("toml")
+	viper.AddConfigPath(homedir)
+	err = viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+
 	rootCmd.PersistentFlags().StringP("folder", "f", ".", "Choose directory to pack")
 
-	err := viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
+	err = viper.BindPFlag("folder", rootCmd.PersistentFlags().Lookup("folder"))
 	if err != nil {
 		panic(err)
 	}
