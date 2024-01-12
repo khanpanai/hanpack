@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -46,6 +43,7 @@ Be aware, it can take more time if you run it in large folders`,
 		}
 
 		viper.Set("archive", fmt.Sprintf("%s.zip", name))
+		viper.Set("black_list", append(viper.GetStringSlice("black_list"), viper.GetString("archive")))
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		f := viper.GetString("folder")
@@ -120,10 +118,9 @@ func walk(paths chan<- string) filepath.WalkFunc {
 			return nil
 		}
 
-		restrictedDir := append(viper.GetStringSlice("black_list"), viper.GetString("archive"))
+		restrictedDir := viper.GetStringSlice("black_list")
 
 		for i := range restrictedDir {
-
 			if restrictedDir[i] == filepath.Base(path) {
 				return filepath.SkipDir
 			}
@@ -146,7 +143,6 @@ func Execute(ctx context.Context) {
 }
 
 func init() {
-
 	homedir, err := os.UserHomeDir()
 
 	if err != nil {
@@ -156,13 +152,11 @@ func init() {
 	homedir = filepath.Join(homedir, ".hanpack")
 	configPath := filepath.Join(homedir, "config.toml")
 	if _, err = os.Stat(homedir); errors.Is(err, os.ErrNotExist) {
-
 		err = os.Mkdir(homedir, os.ModePerm)
 
 		if err != nil {
 			panic("Can't create .hanpack folder")
 		}
-
 	}
 
 	if _, err = os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
