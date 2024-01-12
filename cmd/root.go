@@ -100,7 +100,6 @@ func processEntries(wg *sync.WaitGroup, paths <-chan string) {
 
 		fmt.Println(fmt.Sprintf("Packed: %s", path))
 	}
-
 }
 
 func walk(paths chan<- string) filepath.WalkFunc {
